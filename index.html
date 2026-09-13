@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>OPFS field check</title>
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22OPFS%20field%20check%22%2C%22short_name%22%3A%22OPFS%20check%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23ffffff%22%2C%22theme_color%22%3A%22%23123a2e%22%7D">
+<style>
+  :root{
+    --ink:#12241d;
+    --paper:#fbfaf6;
+    --rule:#c9c6ba;
+    --pass:#1d6b45;
+    --fail:#9c2f24;
+    --wait:#8a7a3d;
+    --dim:#5f6b64;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    padding:1.25rem 1.1rem 4rem;
+    background:var(--paper);
+    color:var(--ink);
+    font:400 17px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    max-width:44rem;
+  }
+  h1{font-size:1.35rem;line-height:1.2;margin:0 0 .2rem;font-weight:650;letter-spacing:-.01em}
+  .sub{color:var(--dim);font-size:.92rem;margin:0 0 1.6rem}
+  h2{
+    font-size:.95rem;font-weight:650;margin:2.2rem 0 .6rem;
+    padding-bottom:.35rem;border-bottom:1.5px solid var(--ink);
+  }
+  dl{margin:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.1rem .8rem}
+  dt{color:var(--dim);font-size:.9rem;padding:.32rem 0;border-bottom:1px solid var(--rule);min-width:0}
+  dd{margin:0;padding:.32rem 0;border-bottom:1px solid var(--rule);text-align:right;
+     font-variant-numeric:tabular-nums;font-size:.9rem;white-space:nowrap}
+  .pass{color:var(--pass);font-weight:650}
+  .fail{color:var(--fail);font-weight:650}
+  .wait{color:var(--wait);font-weight:650}
+  button{
+    font:inherit;font-size:.95rem;font-weight:550;
+    background:var(--ink);color:var(--paper);
+    border:none;border-radius:2px;
+    padding:.85rem 1.1rem;margin:.4rem .4rem .4rem 0;
+    min-height:48px;cursor:pointer;
+  }
+  button.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink)}
+  button:disabled{opacity:.4;cursor:default}
+  button:focus-visible{outline:3px solid var(--wait);outline-offset:2px}
+  input[type=url],select{
+    font:inherit;font-size:.95rem;width:100%;padding:.75rem .7rem;min-height:48px;
+    border:1.5px solid var(--rule);border-radius:2px;background:#fff;color:var(--ink);margin:.4rem 0;
+  }
+  progress{width:100%;height:10px;margin:.5rem 0}
+  .log{
+    font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;
+    white-space:pre-wrap;word-break:break-word;
+    background:#fff;border:1px solid var(--rule);padding:.7rem;margin-top:.7rem;
+    max-height:14rem;overflow:auto;
+  }
+  video{width:100%;background:#000;margin-top:.7rem}
+  .note{font-size:.86rem;color:var(--dim);margin:.6rem 0 0}
+  .verdict{padding:.8rem .9rem;margin:.8rem 0 0;border-left:4px solid var(--rule);background:#fff;font-size:.92rem}
+  .verdict.pass{border-left-color:var(--pass)}
+  .verdict.fail{border-left-color:var(--fail)}
+  .verdict.wait{border-left-color:var(--wait)}
+</style>
+</head>
+<body>
+
+<h1>OPFS field check</h1>
+<p class="sub">Run this on the actual device in the actual hall. Serve over HTTPS — OPFS needs a secure context.</p>
+
+<h2>Environment</h2>
+<dl id="env"></dl>
+<p class="note" id="engine-note"></p>
+
+<h2>1 · Can it write?</h2>
+<p class="note">Writes a file of real size to OPFS on the main thread, then in a Web Worker. Both paths matter: older Safari only supports the Worker one.</p>
+<select id="size">
+  <option value="100">100 MB — quick check</option>
+  <option value="350" selected>350 MB — one lesson</option>
+  <option value="700">700 MB — one week</option>
+  <option value="2000">2 GB — a fortnight</option>
+</select>
+<button id="run-main">Write on main thread</button>
+<button id="run-worker" class="ghost">Write in Worker</button>
+<progress id="write-prog" value="0" max="100" hidden></progress>
+<div class="log" id="write-log">Not run yet.</div>
+
+<h2>2 · Can it play a real video?</h2>
+<p class="note">Downloads an MP4 to OPFS and plays it back from disk. Paste a URL to one of your own files, or leave blank to make a synthetic file (writes and reads, but will not play).</p>
+<input type="url" id="video-url" placeholder="https://… .mp4" autocomplete="off" spellcheck="false">
+<button id="run-video">Download and play from OPFS</button>
+<progress id="video-prog" value="0" max="100" hidden></progress>
+<div class="log" id="video-log">Not run yet.</div>
+<video id="player" controls playsinline hidden></video>
+
+<h2>3 · Does it survive?</h2>
+<p class="note">The one that actually decides this. Stamp a marker, leave the device alone for a week without opening the site, then come back and check. Eviction is the risk, not the API.</p>
+<button id="stamp">Stamp marker</button>
+<button id="check" class="ghost">Check marker</button>
+<div class="log" id="persist-log">Not run yet.</div>
+
+<h2>Housekeeping</h2>
+<button id="quota" class="ghost">Refresh storage figures</button>
+<button id="wipe" class="ghost">Delete everything this page wrote</button>
+<div class="log" id="admin-log">—</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const MB = 1024 * 1024;
+const fmt = b => b == null ? '—' :
+  b >= 1024*MB ? (b/(1024*MB)).toFixed(2)+' GB' :
+  b >= MB ? (b/MB).toFixed(0)+' MB' : (b/1024).toFixed(0)+' KB';
+
+function row(dl, label, value, cls){
+  const dt = document.createElement('dt'); dt.textContent = label;
+  const dd = document.createElement('dd'); dd.textContent = value;
+  if (cls) dd.className = cls;
+  dl.append(dt, dd);
+}
+const yn = v => v ? ['yes','pass'] : ['no','fail'];
+
+// ---------- environment ----------
+const ua = navigator.userAgent;
+const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const installed = window.matchMedia('(display-mode: standalone)').matches ||
+  navigator.standalone === true;
+
+let hasOPFS = false, hasWritable = false, hasSync = false;
+try { hasOPFS = !!(navigator.storage && navigator.storage.getDirectory); } catch {}
+try { hasWritable = typeof FileSystemFileHandle !== 'undefined' &&
+      'createWritable' in FileSystemFileHandle.prototype; } catch {}
+try { hasSync = typeof FileSystemFileHandle !== 'undefined' &&
+      'createSyncAccessHandle' in FileSystemFileHandle.prototype; } catch {}
+
+async function drawEnv(){
+  const dl = $('env'); dl.innerHTML = '';
+  row(dl, 'Secure context', ...yn(window.isSecureContext));
+  row(dl, 'Engine', isIOS ? 'WebKit' : (/Firefox/.test(ua) ? 'Gecko' : 'Chromium (likely)'));
+  row(dl, 'Installed to home screen', ...yn(installed));
+  row(dl, 'OPFS available', ...yn(hasOPFS));
+  row(dl, 'createWritable (main thread)', ...yn(hasWritable));
+  row(dl, 'createSyncAccessHandle', ...yn(hasSync));
+
+  let persisted = null;
+  try { persisted = await navigator.storage.persisted(); } catch {}
+  row(dl, 'Storage marked persistent', ...(persisted === null ? ['unknown','wait'] : yn(persisted)));
+
+  try {
+    const e = await navigator.storage.estimate();
+    row(dl, 'Used', fmt(e.usage));
+    row(dl, 'Quota', fmt(e.quota));
+    row(dl, 'Free', fmt(e.quota - e.usage));
+  } catch { row(dl, 'Quota', 'unavailable', 'wait'); }
+
+  $('engine-note').textContent = isIOS
+    ? 'iOS and iPadOS: every browser uses WebKit. Installing Chrome or Edge changes nothing here.'
+    : 'Not iOS, so the engine is whatever the browser ships.';
+}
+
+// ---------- OPFS helpers ----------
+const DIR = 'field-check';
+async function dir(){
+  const root = await navigator.storage.getDirectory();
+  return root.getDirectoryHandle(DIR, { create: true });
+}
+function chunk(n){ const a = new Uint8Array(n); crypto.getRandomValues(a.subarray(0, Math.min(n, 65536))); return a; }
+
+// ---------- 1. write tests ----------
+async function writeMain(mb, log, prog){
+  const d = await dir();
+  const fh = await d.getFileHandle('main-thread.bin', { create: true });
+  const w = await fh.createWritable();
+  const block = chunk(4 * MB);
+  const t0 = performance.now();
+  for (let i = 0; i < mb / 4; i++){
+    await w.write(block);
+    prog.value = (i + 1) / (mb / 4) * 100;
+    if (i % 8 === 0) await new Promise(r => setTimeout(r));
+  }
+  await w.close();
+  const f = await fh.getFile();
+  log(`Wrote ${fmt(f.size)} in ${((performance.now()-t0)/1000).toFixed(1)}s`);
+  return f.size;
+}
+
+const WORKER_SRC = `
+self.onmessage = async (e) => {
+  const { mb } = e.data;
+  try {
+    const root = await navigator.storage.getDirectory();
+    const d = await root.getDirectoryHandle('${DIR}', { create: true });
+    const fh = await d.getFileHandle('worker.bin', { create: true });
+    const h = await fh.createSyncAccessHandle();
+    h.truncate(0);
+    const block = new Uint8Array(4 * 1024 * 1024);
+    let at = 0;
+    for (let i = 0; i < mb / 4; i++){
+      h.write(block, { at }); at += block.length;
+      if (i % 8 === 0) self.postMessage({ progress: (i+1)/(mb/4)*100 });
+    }
+    h.flush(); const size = h.getSize(); h.close();
+    self.postMessage({ done: true, size });
+  } catch (err) { self.postMessage({ error: String(err && err.message || err) }); }
+};`;
+
+function writeWorker(mb, log, prog){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+    const wk = new Worker(url);
+    const t0 = performance.now();
+    wk.onmessage = e => {
+      const m = e.data;
+      if (m.progress != null) prog.value = m.progress;
+      if (m.error){ wk.terminate(); URL.revokeObjectURL(url); reject(new Error(m.error)); }
+      if (m.done){
+        wk.terminate(); URL.revokeObjectURL(url);
+        log(`Wrote ${fmt(m.size)} in ${((performance.now()-t0)/1000).toFixed(1)}s`);
+        resolve(m.size);
+      }
+    };
+    wk.onerror = err => { wk.terminate(); URL.revokeObjectURL(url); reject(new Error(err.message || 'worker failed')); };
+    wk.postMessage({ mb });
+  });
+}
+
+function logger(el){
+  el.textContent = '';
+  return line => { el.textContent += (el.textContent ? '\n' : '') + line; el.scrollTop = el.scrollHeight; };
+}
+
+async function guarded(btns, fn, el){
+  btns.forEach(b => b.disabled = true);
+  const log = logger(el);
+  try { await fn(log); }
+  catch (err){ log('FAILED: ' + (err && err.message || err)); log('This is the answer you came for. Note the device, OS version and browser.'); }
+  finally { btns.forEach(b => b.disabled = false); drawEnv(); }
+}
+
+const writeBtns = [$('run-main'), $('run-worker')];
+
+$('run-main').onclick = () => guarded(writeBtns, async log => {
+  const mb = +$('size').value;
+  if (!hasWritable) { log('createWritable is not available on this browser.'); log('Use the Worker path instead — that is the real finding.'); return; }
+  $('write-prog').hidden = false; $('write-prog').value = 0;
+  log(`Main thread, ${mb} MB…`);
+  await writeMain(mb, log, $('write-prog'));
+  log('Main-thread write works on this device.');
+}, $('write-log'));
+
+$('run-worker').onclick = () => guarded(writeBtns, async log => {
+  const mb = +$('size').value;
+  if (!hasSync) { log('createSyncAccessHandle is not available.'); return; }
+  $('write-prog').hidden = false; $('write-prog').value = 0;
+  log(`Worker + createSyncAccessHandle, ${mb} MB…`);
+  await writeWorker(mb, log, $('write-prog'));
+  log('Worker write works on this device.');
+}, $('write-log'));
+
+// ---------- 2. video ----------
+$('run-video').onclick = () => guarded([$('run-video')], async log => {
+  const url = $('video-url').value.trim();
+  const d = await dir();
+  const fh = await d.getFileHandle('lesson.mp4', { create: true });
+
+  if (!url){
+    log('No URL given — writing a 50 MB synthetic file instead.');
+    const w = await fh.createWritable();
+    const block = chunk(4 * MB);
+    for (let i = 0; i < 12; i++) await w.write(block);
+    await w.close();
+    const f = await fh.getFile();
+    log(`Stored ${fmt(f.size)}. It will not play — paste a real MP4 URL to test playback.`);
+    return;
+  }
+
+  log('Fetching ' + url);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const total = +res.headers.get('content-length') || 0;
+  const prog = $('video-prog'); prog.hidden = false; prog.value = 0;
+
+  const w = await fh.createWritable();
+  const reader = res.body.getReader();
+  let got = 0;
+  for (;;){
+    const { done, value } = await reader.read();
+    if (done) break;
+    await w.write(value);
+    got += value.length;
+    if (total) prog.value = got / total * 100;
+  }
+  await w.close();
+
+  const file = await fh.getFile();
+  log(`Stored ${fmt(file.size)} in OPFS.`);
+
+  const player = $('player');
+  player.hidden = false;
+  player.src = URL.createObjectURL(file);
+  await new Promise((res2, rej) => {
+    player.onloadedmetadata = res2;
+    player.onerror = () => rej(new Error('the browser refused to play the stored file'));
+    setTimeout(() => rej(new Error('timed out waiting for metadata')), 15000);
+  });
+  log(`Plays from OPFS. Duration ${player.duration.toFixed(1)}s.`);
+  log('Press play to confirm it actually decodes.');
+}, $('video-log'));
+
+// ---------- 3. persistence ----------
+$('stamp').onclick = () => guarded([$('stamp')], async log => {
+  let granted = false;
+  try { granted = await navigator.storage.persist(); } catch {}
+  log('persist() returned: ' + granted);
+  if (!granted) log('Not granted. On Chromium this is heuristic; installing to the home screen usually helps.');
+  const d = await dir();
+  const fh = await d.getFileHandle('marker.json', { create: true });
+  const w = await fh.createWritable();
+  await w.write(JSON.stringify({ at: Date.now(), iso: new Date().toISOString(), installed, granted }));
+  await w.close();
+  log('Marker stamped ' + new Date().toLocaleString());
+  log('Now leave the device alone. Do not open this page for a week.');
+}, $('persist-log'));
+
+$('check').onclick = () => guarded([$('check')], async log => {
+  const d = await dir();
+  let data;
+  try {
+    const fh = await d.getFileHandle('marker.json');
+    data = JSON.parse(await (await fh.getFile()).text());
+  } catch {
+    log('MARKER GONE — storage was evicted.');
+    log('This is the Risk B failure. Native (Capacitor) is the answer, not a workaround.');
+    return;
+  }
+  const days = (Date.now() - data.at) / 86400000;
+  log(`Marker survived ${days.toFixed(1)} days (stamped ${new Date(data.at).toLocaleString()}).`);
+  log(`Installed when stamped: ${data.installed}. persist() granted: ${data.granted}.`);
+
+  let bytes = 0, files = [];
+  for await (const [name, h] of d.entries()){
+    if (h.kind === 'file'){ const f = await h.getFile(); bytes += f.size; files.push(`${name} ${fmt(f.size)}`); }
+  }
+  log('Files still present: ' + (files.join(', ') || 'none'));
+  log('Total still stored: ' + fmt(bytes));
+  if (days >= 7 && bytes > 100 * MB) log('PASSED the seven-day test with real volume on disk.');
+  else if (days < 7) log('Come back after seven days for the answer that matters.');
+  else log('Marker survived but the large files did not — partial eviction. Treat as a failure.');
+}, $('persist-log'));
+
+// ---------- housekeeping ----------
+$('quota').onclick = () => guarded([$('quota')], async log => {
+  const e = await navigator.storage.estimate();
+  log(`Used ${fmt(e.usage)} of ${fmt(e.quota)} — ${fmt(e.quota - e.usage)} free.`);
+  if (e.usageDetails) log(JSON.stringify(e.usageDetails, null, 2));
+}, $('admin-log'));
+
+$('wipe').onclick = () => guarded([$('wipe')], async log => {
+  const root = await navigator.storage.getDirectory();
+  await root.removeEntry(DIR, { recursive: true });
+  log('Deleted everything under /' + DIR + '.');
+}, $('admin-log'));
+
+drawEnv();
+</script>
+</body>
+</html>
