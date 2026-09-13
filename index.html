@@ -133,12 +133,34 @@ const isIOS = /iPad|iPhone|iPod/.test(ua) ||
 const installed = window.matchMedia('(display-mode: standalone)').matches ||
   navigator.standalone === true;
 
-let hasOPFS = false, hasWritable = false, hasSync = false;
+let hasOPFS = false, hasWritable = false, hasSync = null; // null = not yet probed
 try { hasOPFS = !!(navigator.storage && navigator.storage.getDirectory); } catch {}
 try { hasWritable = typeof FileSystemFileHandle !== 'undefined' &&
       'createWritable' in FileSystemFileHandle.prototype; } catch {}
-try { hasSync = typeof FileSystemFileHandle !== 'undefined' &&
-      'createSyncAccessHandle' in FileSystemFileHandle.prototype; } catch {}
+
+// createSyncAccessHandle only exists inside a Worker. Probing it on the main
+// thread gives a false negative on Safari, so ask a Worker instead.
+const PROBE_SRC = `self.onmessage = () => {
+  let ok = false;
+  try { ok = typeof FileSystemFileHandle !== 'undefined' &&
+        'createSyncAccessHandle' in FileSystemFileHandle.prototype; } catch {}
+  self.postMessage(ok);
+};`;
+
+function probeSync(){
+  return new Promise(resolve => {
+    let url;
+    try {
+      url = URL.createObjectURL(new Blob([PROBE_SRC], { type: 'text/javascript' }));
+      const wk = new Worker(url);
+      const done = v => { wk.terminate(); URL.revokeObjectURL(url); resolve(v); };
+      wk.onmessage = e => done(!!e.data);
+      wk.onerror = () => done(false);
+      setTimeout(() => done(false), 3000);
+      wk.postMessage(1);
+    } catch { if (url) URL.revokeObjectURL(url); resolve(false); }
+  });
+}
 
 async function drawEnv(){
   const dl = $('env'); dl.innerHTML = '';
@@ -147,7 +169,8 @@ async function drawEnv(){
   row(dl, 'Installed to home screen', ...yn(installed));
   row(dl, 'OPFS available', ...yn(hasOPFS));
   row(dl, 'createWritable (main thread)', ...yn(hasWritable));
-  row(dl, 'createSyncAccessHandle', ...yn(hasSync));
+  row(dl, 'createSyncAccessHandle (in Worker)',
+      ...(hasSync === null ? ['probing…','wait'] : yn(hasSync)));
 
   let persisted = null;
   try { persisted = await navigator.storage.persisted(); } catch {}
@@ -160,9 +183,14 @@ async function drawEnv(){
     row(dl, 'Free', fmt(e.quota - e.usage));
   } catch { row(dl, 'Quota', 'unavailable', 'wait'); }
 
-  $('engine-note').textContent = isIOS
+  const engine = isIOS
     ? 'iOS and iPadOS: every browser uses WebKit. Installing Chrome or Edge changes nothing here.'
     : 'Not iOS, so the engine is whatever the browser ships.';
+  const verdict = hasWritable
+    ? ' createWritable works on the main thread, so the simple download path is available — no Worker needed.'
+    : hasSync ? ' No main-thread createWritable: downloads must run in a Worker via createSyncAccessHandle.'
+    : '';
+  $('engine-note').textContent = engine + verdict;
 }
 
 // ---------- OPFS helpers ----------
@@ -369,6 +397,7 @@ $('wipe').onclick = () => guarded([$('wipe')], async log => {
 }, $('admin-log'));
 
 drawEnv();
+probeSync().then(v => { hasSync = v; drawEnv(); });
 </script>
 </body>
 </html>
