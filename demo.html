@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0F2A1D">
+<title>PE</title>
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22PE%22%2C%22short_name%22%3A%22PE%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22orientation%22%3A%22any%22%2C%22background_color%22%3A%22%230F2A1D%22%2C%22theme_color%22%3A%22%230F2A1D%22%7D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --pitch:#0F2A1D; --deep:#0A1F15; --panel:#16351F; --panel2:#1D4029;
+  --paper:#FBFBF8; --mute:#9FB3A5;
+  --red:#CE3B2C; --blue:#2E74C4; --green:#3BA463; --gold:#E0A81B;
+  --tab:64px;
+  --top:env(safe-area-inset-top); --bot:env(safe-area-inset-bottom);
+  --l:env(safe-area-inset-left); --r:env(safe-area-inset-right);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
+  height:100%;margin:0;overflow:hidden;position:fixed;width:100%;
+  overscroll-behavior:none;touch-action:manipulation;
+}
+body{
+  background:var(--deep);color:var(--paper);
+  font:400 16px/1.45 Archivo,system-ui,-apple-system,sans-serif;
+  font-variation-settings:'wdth' 100;
+  -webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;
+}
+button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;
+  touch-action:manipulation}
+:focus-visible{outline:3px solid var(--gold);outline-offset:-3px}
+.wide{font-variation-settings:'wdth' 118;letter-spacing:-.015em}
+.num{font-variant-numeric:tabular-nums;font-weight:900;line-height:1}
+
+/* ---------- shell ---------- */
+#app{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--pitch)}
+.topbar{
+  flex:0 0 auto;padding:calc(var(--top) + .85rem) calc(var(--r) + 1.1rem) .85rem calc(var(--l) + 1.1rem);
+  display:flex;align-items:baseline;gap:.6rem;background:var(--pitch);
+}
+.topbar h1{margin:0;font-size:1.6rem;font-weight:900;line-height:1}
+.topbar .sub{color:var(--mute);font-size:.9rem;margin-left:auto}
+
+.screens{flex:1 1 auto;position:relative;min-height:0}
+.screen{
+  position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:0 calc(var(--r) + 1.1rem) 1.4rem calc(var(--l) + 1.1rem);
+  opacity:0;pointer-events:none;transform:translateX(10px);
+  transition:opacity .18s ease,transform .18s ease;
+}
+.screen.on{opacity:1;pointer-events:auto;transform:none}
+
+/* ---------- tab bar ---------- */
+.tabs{
+  flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);
+  background:var(--deep);border-top:1px solid #1E4230;
+  padding:0 var(--r) var(--bot) var(--l);
+}
+.tab{height:var(--tab);display:grid;place-content:center;gap:.18rem;color:var(--mute);
+  font-size:.7rem;font-weight:600;justify-items:center}
+.tab svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+.tab[aria-selected=true]{color:var(--paper)}
+.tab[aria-selected=true] svg{stroke:var(--gold)}
+
+/* ---------- cards / lists ---------- */
+.rowcard{
+  display:flex;align-items:center;gap:.9rem;width:100%;text-align:left;
+  background:var(--panel);border-radius:12px;padding:.85rem .95rem;margin-bottom:.55rem;
+  border-left:4px solid var(--c,var(--gold));transition:transform .09s;
+}
+.rowcard:active{transform:scale(.985)}
+.rowcard .tt{font-weight:800;font-size:1.03rem;line-height:1.15}
+.rowcard .mm{color:var(--mute);font-size:.83rem;margin-top:.1rem}
+.rowcard .go{margin-left:auto;color:var(--mute);flex:0 0 auto}
+.rowcard[aria-current=true]{background:var(--panel2)}
+.chip{font-size:.7rem;font-weight:700;background:#0d2b1c;color:var(--mute);
+  padding:.2rem .45rem;border-radius:5px;flex:0 0 auto}
+.chip.ready{background:#12402a;color:#7fd6a0}
+
+h2.sec{font-size:.78rem;font-weight:700;color:var(--mute);margin:1.4rem 0 .5rem;
+  font-variation-settings:'wdth' 92}
+.blurb{color:var(--mute);font-size:.92rem;margin:.2rem 0 1rem;max-width:52ch}
+
+.cta{
+  width:100%;background:var(--gold);color:var(--pitch);font-weight:800;font-size:1.05rem;
+  border-radius:12px;padding:1.05rem;margin:.3rem 0 .2rem;transition:transform .09s;
+}
+.cta:active{transform:scale(.985)}
+.cta.quiet{background:var(--panel);color:var(--paper)}
+
+/* class grid */
+.clsgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:.45rem}
+.clskid{background:var(--panel);border-radius:10px;padding:.7rem .3rem;display:grid;
+  justify-items:center;gap:.4rem;border:2px solid transparent}
+.clskid .disc{width:34px;height:34px;border-radius:50%;background:var(--c);
+  display:grid;place-content:center;font-weight:800;font-size:.85rem;color:#fff}
+.clskid .nm{font-size:.78rem;line-height:1.1;text-align:center}
+.clskid[aria-pressed=true]{opacity:.32;border-color:var(--panel2)}
+
+/* results */
+.tot{display:grid;grid-template-columns:repeat(4,1fr);gap:.45rem;margin:.2rem 0 1.2rem}
+.tot > div{background:var(--panel);border-radius:10px;padding:.75rem .3rem;text-align:center;
+  border-bottom:4px solid var(--c)}
+.tot .num{font-size:1.65rem}
+.tot .lbl{color:var(--mute);font-size:.72rem;font-weight:600;margin-top:.15rem}
+.best{display:flex;align-items:baseline;gap:.6rem;padding:.65rem .2rem;border-bottom:1px solid #1E4230}
+.best .v{margin-left:auto;font-weight:900;font-variant-numeric:tabular-nums}
+.best .nb{font-size:.72rem;font-weight:700;color:#7fd6a0}
+.empty{color:var(--mute);text-align:center;padding:3rem 1rem;font-size:.95rem}
+
+/* ---------- RUN: fullscreen, no scroll ---------- */
+#run{position:fixed;inset:0;z-index:40;background:var(--pitch);display:none;
+  flex-direction:column;transform:translateY(100%);transition:transform .26s cubic-bezier(.32,.72,0,1)}
+#run.up{display:flex;transform:none}
+.rbar{flex:0 0 auto;display:flex;align-items:center;gap:.5rem;
+  padding:calc(var(--top) + .55rem) calc(var(--r) + .7rem) .55rem calc(var(--l) + .7rem)}
+.rbar .t{font-weight:900;font-size:clamp(1rem,2.2vh,1.5rem);line-height:1}
+.rbar .rd{color:var(--mute);font-size:clamp(.75rem,1.6vh,.95rem);margin-right:auto;white-space:nowrap}
+.rbar button{background:var(--panel2);border-radius:9px;padding:.55rem .8rem;min-height:44px;
+  font-weight:700;font-size:.88rem;white-space:nowrap}
+.rbar button.pri{background:var(--gold);color:var(--pitch);font-weight:800}
+
+.rbody{flex:1 1 auto;display:grid;gap:.55rem;min-height:0;
+  grid-template-columns:minmax(0,57fr) minmax(0,43fr);
+  padding:0 calc(var(--r) + .7rem) calc(var(--bot) + .7rem) calc(var(--l) + .7rem)}
+.rleft{display:flex;flex-direction:column;gap:.55rem;min-height:0}
+.rvid{flex:1 1 auto;background:#000;border-radius:12px;overflow:hidden;position:relative;min-height:0}
+.rvid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.ph{position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:.4rem;padding:1.5rem;
+  background:repeating-linear-gradient(135deg,#16351f,#16351f 20px,#132e1c 20px,#132e1c 40px)}
+.ph strong{font-size:clamp(1rem,3vh,1.9rem);font-weight:900}
+.ph span{color:var(--mute);font-size:.82rem;max-width:32ch;margin:0 auto}
+
+.teams{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem}
+.tm{background:var(--panel);border-radius:10px;padding:.45rem .25rem;text-align:center;
+  position:relative;overflow:hidden}
+.tm .fill{position:absolute;inset:auto 0 0 0;background:var(--c);opacity:.85;height:0;
+  transition:height .4s cubic-bezier(.2,.8,.3,1)}
+.tm .num,.tm .lbl{position:relative}
+.tm .num{font-size:clamp(1.3rem,4vh,2.6rem)}
+.tm .lbl{color:#C6D8CC;font-size:clamp(.62rem,1.3vh,.85rem);font-weight:600}
+
+.rkids{display:grid;gap:.4rem;min-height:0;grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-auto-rows:minmax(0,1fr)}
+.rk{background:var(--panel);border:2px solid transparent;border-radius:10px;
+  display:grid;grid-template-rows:auto 1fr;place-items:center;padding:.25rem;min-height:0;
+  transition:transform .07s,background .12s}
+.rk .n{font-size:clamp(.62rem,1.45vh,.9rem);line-height:1.05;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk .s{font-size:clamp(1.1rem,3.8vh,2.4rem);font-weight:900;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--c)}
+.rk:active{transform:scale(.92)}
+.rk.hit{background:var(--c)}
+.rk.hit .s,.rk.hit .n{color:#fff}
+.rk.out{opacity:.3}
+.rk.out .s{color:var(--mute);font-size:clamp(.9rem,2.2vh,1.4rem)}
+
+@media (orientation:portrait){
+  .rbody{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .rleft{flex:0 0 auto}
+  .rvid{aspect-ratio:16/9;flex:0 0 auto}
+}
+
+/* ---------- sheet ---------- */
+#sheet{position:fixed;inset:0;z-index:60;display:none}
+#sheet.open{display:block}
+#sheet .scrim{position:absolute;inset:0;background:rgba(5,16,11,.6);opacity:0;transition:opacity .22s}
+#sheet.open .scrim{opacity:1}
+#sheet .card{position:absolute;left:0;right:0;bottom:0;background:var(--pitch);
+  border-radius:18px 18px 0 0;padding:1rem calc(var(--r) + 1.1rem) calc(var(--bot) + 1.1rem) calc(var(--l) + 1.1rem);
+  max-height:82%;overflow-y:auto;overscroll-behavior:contain;
+  transform:translateY(100%);transition:transform .26s cubic-bezier(.32,.72,0,1)}
+#sheet.open .card{transform:none}
+.grab{width:38px;height:4px;border-radius:2px;background:#31563F;margin:0 auto .9rem}
+#sheet h3{margin:0 0 .15rem;font-size:1.1rem;font-weight:800}
+</style>
+</head>
+<body>
+
+<!-- ====================================================================
+     EDIT HERE — replace videoId with an unlisted YouTube ID per lesson.
+     ==================================================================== -->
+<script>
+const CONFIG = {
+  className:'Class 4B',
+  teams:[
+    {id:'red',  name:'Kestrels',colour:'var(--red)'},
+    {id:'blue', name:'Otters',  colour:'var(--blue)'},
+    {id:'green',name:'Foxes',   colour:'var(--green)'},
+    {id:'gold', name:'Badgers', colour:'var(--gold)'}
+  ],
+  pupils:[
+    ['Amelia','red'],['Zayn','red'],['Priya','red'],['Tom','red'],['Grace','red'],['Kwame','red'],
+    ['Noah','blue'],['Isla','blue'],['Dev','blue'],['Maya','blue'],['Leo','blue'],['Freya','blue'],
+    ['Jonah','green'],['Aisha','green'],['Ben','green'],['Lily','green'],['Omar','green'],['Nina','green'],
+    ['Ruby','gold'],['Finn','gold'],['Sofia','gold'],['Ade','gold'],['Ivy','gold'],['Max','gold']
+  ],
+  lessons:[
+    {title:'Star jumps',      rounds:3,unit:'jumps',  years:'Years 3–4',mb:340,videoId:'REPLACE_ME_1'},
+    {title:'Speed bounce',    rounds:3,unit:'bounces',years:'Years 3–4',mb:310,videoId:'REPLACE_ME_2'},
+    {title:'Balance and hold',rounds:4,unit:'holds',  years:'Years 1–2',mb:420,videoId:'REPLACE_ME_3'},
+    {title:'Relay shuttles',  rounds:2,unit:'lengths',years:'Years 5–6',mb:260,videoId:'REPLACE_ME_4'}
+  ]
+};
+</script>
+
+<div id="app">
+  <div class="topbar">
+    <h1 class="wide" id="ttl">Lessons</h1>
+    <span class="sub" id="tsub">Class 4B</span>
+  </div>
+
+  <div class="screens">
+    <div class="screen on" id="s-lessons"></div>
+    <div class="screen" id="s-class"></div>
+    <div class="screen" id="s-results"></div>
+    <div class="screen" id="s-about"></div>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-s="lessons" aria-selected="true">
+      <svg viewBox="0 0 24 24"><path d="M5 4h14v16l-7-4-7 4z"/></svg><span>Lessons</span></button>
+    <button class="tab" role="tab" data-s="class" aria-selected="false">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 6a3 3 0 010 6M18 20c0-2.5-1-4-2.5-4.6"/></svg><span>Class</span></button>
+    <button class="tab" role="tab" data-s="results" aria-selected="false">
+      <svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Results</span></button>
+    <button class="tab" role="tab" data-s="about" aria-selected="false">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.2"/></svg><span>About</span></button>
+  </nav>
+</div>
+
+<!-- ================= RUN ================= -->
+<div id="run" role="application" aria-label="Lesson running">
+  <div class="rbar">
+    <span class="t wide" id="r-t">Star jumps</span>
+    <span class="rd" id="r-rd">Round 1 of 3</span>
+    <button id="r-undo">Undo</button>
+    <button id="r-abs">Absent</button>
+    <button id="r-next">Next round</button>
+    <button class="pri" id="r-fin">Finish</button>
+    <button id="r-x" aria-label="Close lesson">✕</button>
+  </div>
+  <div class="rbody">
+    <div class="rleft">
+      <div class="rvid" id="r-vid"></div>
+      <div class="teams" id="r-teams"></div>
+    </div>
+    <div class="rkids" id="r-kids"></div>
+  </div>
+</div>
+
+<!-- ================= SHEET ================= -->
+<div id="sheet" role="dialog" aria-modal="true" aria-label="Not taking part">
+  <div class="scrim" data-close></div>
+  <div class="card">
+    <div class="grab"></div>
+    <h3>Not taking part today</h3>
+    <p class="blurb">Tap a name to leave them out. Their scores won't count towards the team.</p>
+    <div class="clsgrid" id="sh-kids"></div>
+    <button class="cta" id="sh-done" style="margin-top:1rem">Done</button>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const team=t=>CONFIG.teams.find(x=>x.id===t);
+const vid=(id,t)=>id.startsWith('REPLACE_')
+  ?`<div class="ph"><strong>${t}</strong><span>Add an unlisted YouTube ID in the CONFIG block at the top of this file.</span></div>`
+  :`<iframe src="https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1" title="${t}" allow="accelerometer;autoplay;encrypted-media;picture-in-picture" allowfullscreen></iframe>`;
+
+const S={
+  tab:'lessons', i:0, round:1, ran:false,
+  pupils:CONFIG.pupils.map(([name,t],id)=>({id,name,team:t,score:0,best:0,absent:false,nb:false})),
+  hist:[]
+};
+const TITLES={lessons:'Lessons',class:CONFIG.className,results:'Results',about:'About'};
+
+/* ---------- screens ---------- */
+function drawLessons(){
+  $('s-lessons').innerHTML=`
+    <p class="blurb">Downloaded and ready to run without WiFi.</p>
+    ${CONFIG.lessons.map((l,n)=>`
+      <button class="rowcard" data-i="${n}" aria-current="${n===S.i}" style="--c:${CONFIG.teams[n%4].colour}">
+        <span>
+          <span class="tt">${l.title}</span>
+          <span class="mm">${l.years} · ${l.rounds} rounds · ${l.unit}</span>
+        </span>
+        <span class="chip ready">${l.mb} MB</span>
+        <svg class="go" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>`).join('')}
+    <button class="cta" id="go">Run ${CONFIG.lessons[S.i].title}</button>`;
+}
+function drawClass(){
+  $('s-class').innerHTML=`
+    <p class="blurb">${S.pupils.filter(p=>!p.absent).length} of ${S.pupils.length} taking part. Tap to leave someone out.</p>
+    <div class="clsgrid">${S.pupils.map(p=>`
+      <button class="clskid" data-id="${p.id}" aria-pressed="${p.absent}" style="--c:${team(p.team).colour}">
+        <span class="disc">${p.name.slice(0,2)}</span><span class="nm">${p.name}</span>
+      </button>`).join('')}</div>`;
+}
+function drawResults(){
+  if(!S.ran){ $('s-results').innerHTML=`<p class="empty">Run a lesson and the totals will appear here.</p>`; return; }
+  const tot={}; CONFIG.teams.forEach(t=>tot[t.id]=0);
+  S.pupils.forEach(p=>{ if(!p.absent) tot[p.team]+=p.best; });
+  const took=S.pupils.filter(p=>!p.absent&&p.best>0);
+  $('s-results').innerHTML=`
+    <p class="blurb">${CONFIG.lessons[S.i].title} · ${took.length} children took part.</p>
+    <div class="tot">${CONFIG.teams.map(t=>`
+      <div style="--c:${t.colour}"><span class="num">${tot[t.id]}</span><div class="lbl">${t.name}</div></div>`).join('')}</div>
+    <h2 class="sec">Personal bests</h2>
+    ${took.map(p=>`<div class="best"><span>${p.name}</span>${p.nb?'<span class="nb">new best</span>':''}<span class="v">${p.best}</span></div>`).join('')}`;
+}
+function drawAbout(){
+  $('s-about').innerHTML=`
+    <h2 class="sec">Runs without WiFi</h2>
+    <p class="blurb">Next week's lessons download on their own whenever the app is opened on a connection. The hall only needs a screen.</p>
+    <h2 class="sec">Children never log in</h2>
+    <p class="blurb">The teacher holds the class list. No accounts, no passwords, no email addresses for children.</p>
+    <h2 class="sec">No individual ranking</h2>
+    <p class="blurb">Team totals and each child's own best. Children see whether they improved, not who came last.</p>
+    <h2 class="sec">One device at the front</h2>
+    <p class="blurb">A single tablet. Nothing for children to carry, drop or share.</p>
+    <p class="blurb" style="margin-top:2rem;font-size:.82rem">Prototype. Videos are placeholders; everything resets on reload.</p>`;
+}
+
+function go(tab){
+  S.tab=tab;
+  document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.s===tab));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id==='s-'+tab));
+  $('ttl').textContent=TITLES[tab];
+  $('tsub').textContent = tab==='class' ? `${S.pupils.filter(p=>!p.absent).length} in` : CONFIG.className;
+  ({lessons:drawLessons,class:drawClass,results:drawResults,about:drawAbout})[tab]();
+  $('s-'+tab).scrollTop=0;
+}
+document.querySelector('.tabs').addEventListener('click',e=>{
+  const b=e.target.closest('.tab'); if(b) go(b.dataset.s);
+});
+
+$('s-lessons').addEventListener('click',e=>{
+  const c=e.target.closest('.rowcard');
+  if(c){ S.i=+c.dataset.i; S.round=1; drawLessons(); return; }
+  if(e.target.closest('#go')) openRun();
+});
+$('s-class').addEventListener('click',e=>{
+  const b=e.target.closest('.clskid'); if(!b) return;
+  const p=S.pupils[+b.dataset.id]; p.absent=!p.absent; if(p.absent) p.score=0;
+  drawClass(); $('tsub').textContent=`${S.pupils.filter(x=>!x.absent).length} in`;
+});
+
+/* ---------- run ---------- */
+function drawTeams(){
+  const tot={}; CONFIG.teams.forEach(t=>tot[t.id]=0);
+  S.pupils.forEach(p=>{ if(!p.absent) tot[p.team]+=p.score; });
+  const max=Math.max(1,...Object.values(tot));
+  $('r-teams').innerHTML=CONFIG.teams.map(t=>`
+    <div class="tm" style="--c:${t.colour}"><div class="fill" style="height:${tot[t.id]/max*100}%"></div>
+      <span class="num">${tot[t.id]}</span><div class="lbl">${t.name}</div></div>`).join('');
+}
+function drawKids(){
+  $('r-kids').innerHTML=S.pupils.map(p=>`
+    <button class="rk${p.absent?' out':''}${p.score>0&&!p.absent?' hit':''}" data-id="${p.id}" style="--c:${team(p.team).colour}">
+      <span class="n">${p.name}</span><span class="s">${p.absent?'—':p.score}</span></button>`).join('');
+}
+function drawRun(){
+  const l=CONFIG.lessons[S.i];
+  $('r-t').textContent=l.title;
+  $('r-rd').textContent=`Round ${S.round} of ${l.rounds} · ${l.unit}`;
+  drawTeams(); drawKids();
+}
+function openRun(){
+  const l=CONFIG.lessons[S.i];
+  $('r-vid').innerHTML=vid(l.videoId,l.title);
+  drawRun(); $('run').classList.add('up');
+  if(screen.orientation?.lock) screen.orientation.lock('landscape').catch(()=>{});
+}
+function closeRun(){
+  $('run').classList.remove('up');
+  setTimeout(()=>{ $('r-vid').innerHTML=''; },280);
+  try{ screen.orientation?.unlock(); }catch{}
+}
+$('r-kids').addEventListener('click',e=>{
+  const b=e.target.closest('.rk'); if(!b) return;
+  const p=S.pupils[+b.dataset.id]; if(p.absent) return;
+  p.score++; S.hist.push(p.id); drawTeams(); drawKids();
+});
+$('r-undo').onclick=()=>{
+  const id=S.hist.pop(); if(id==null) return;
+  S.pupils[id].score=Math.max(0,S.pupils[id].score-1); drawTeams(); drawKids();
+};
+$('r-next').onclick=()=>{
+  const l=CONFIG.lessons[S.i];
+  S.pupils.forEach(p=>{ if(p.score>p.best){p.best=p.score;p.nb=true;} p.score=0; });
+  S.hist=[]; S.round = S.round<l.rounds ? S.round+1 : 1; drawRun();
+};
+$('r-fin').onclick=()=>{
+  S.pupils.forEach(p=>{ if(p.score>p.best){p.best=p.score;p.nb=true;} });
+  S.ran=true; closeRun(); go('results');
+};
+$('r-x').onclick=closeRun;
+
+/* ---------- sheet ---------- */
+function drawSheet(){
+  $('sh-kids').innerHTML=S.pupils.map(p=>`
+    <button class="clskid" data-id="${p.id}" aria-pressed="${p.absent}" style="--c:${team(p.team).colour}">
+      <span class="disc">${p.name.slice(0,2)}</span><span class="nm">${p.name}</span></button>`).join('');
+}
+$('r-abs').onclick=()=>{ drawSheet(); $('sheet').classList.add('open'); };
+$('sh-kids').addEventListener('click',e=>{
+  const b=e.target.closest('.clskid'); if(!b) return;
+  const p=S.pupils[+b.dataset.id]; p.absent=!p.absent; if(p.absent) p.score=0;
+  drawSheet(); drawTeams(); drawKids();
+});
+$('sh-done').onclick=()=>$('sheet').classList.remove('open');
+$('sheet').addEventListener('click',e=>{ if(e.target.dataset.close!==undefined) $('sheet').classList.remove('open'); });
+
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape') return;
+  if($('sheet').classList.contains('open')) $('sheet').classList.remove('open');
+  else if($('run').classList.contains('up')) closeRun();
+});
+document.addEventListener('gesturestart',e=>e.preventDefault());
+
+go('lessons');
+</script>
+</body>
+</html>
